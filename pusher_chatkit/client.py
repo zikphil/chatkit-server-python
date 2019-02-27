@@ -73,7 +73,7 @@ class PusherChatKitClient(object):
         )
 
 
-def process_response(status, body):
+def process_response(status, body, error=""):
     if status >= 200 and status <= 299:
         return json.loads(body)
 
@@ -87,4 +87,4 @@ def process_response(status, body):
         raise PusherForbidden(body)
 
     else:
-        raise PusherBadStatus("%s: %s" % (status, body))
+        raise PusherBadStatus("%s: %s (%s)" % (status, body, error))

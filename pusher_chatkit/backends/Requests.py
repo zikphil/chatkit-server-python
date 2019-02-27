@@ -21,7 +21,7 @@ class RequestsBackend(object):
             method,
             endpoint,
             headers=headers,
-            data=json.dumps(body),
+            data=json.dumps(body) if body else None,
             timeout=30)
 
         return process_response(resp.status_code, resp.text)

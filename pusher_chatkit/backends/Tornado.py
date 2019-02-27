@@ -12,11 +12,11 @@ class TornadoBackend(object):
         self.http = tornado.httpclient.AsyncHTTPClient()
 
     def process_request(self, method, endpoint, body=None, token=None):
-        data = body
         headers = {'Content-Type': 'application/json'}
         future = Future()
 
-        headers['Authorization'] = 'Bearer {}'.format(token['token'])
+        if token:
+            headers['Authorization'] = 'Bearer {}'.format(token['token'])
 
         def process_response_future(response):
             if response.exception() is not None:
@@ -26,12 +26,12 @@ class TornadoBackend(object):
                 result = response.result()
                 code = result.code
                 body = (result.body or b'').decode('utf8')
-                future.set_result(process_response(code, body))
+                future.set_result(process_response(code, body, result.error))
 
         request = tornado.httpclient.HTTPRequest(
             endpoint,
             method=method,
-            body=json.dumps(data),
+            body=json.dumps(body) if body else None,
             headers=headers,
             request_timeout=30)
 
