@@ -1,5 +1,5 @@
 # -*- coding: utf-8 -*-
-from setuptools import setup
+from setuptools import setup, find_packages
 import os
 import re
 
@@ -30,9 +30,7 @@ setup(
     ],
     license='MIT',
 
-    packages=[
-        'pusher_chatkit'
-    ],
+    packages=find_packages(),
 
     install_requires=[
         'requests>=2.3.0',
