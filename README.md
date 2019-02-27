@@ -2,12 +2,32 @@
 
 The Unofficial Python server SDK for Pusher Chatkit.
 
-**WORK IN PROGRESS**
-
 ## Installation
 
 ```sh
-$ python3 setup.py install
+$ pip install pusher-chatkit-server
+```
+
+## Usage
+
+```python
+from pusher_chatkit import PusherChatKit
+from pusher_chatkit.backends import RequestsBackend, TornadoBackend
+
+chatkit = PusherChatKit(
+    'instance-locator',
+    'api-key',
+    RequestsBackend or TornadoBackend
+)
+
+# Requests Example
+data = chatkit.create_user(...)
+print(data)
+
+# Tornado Example
+data = await chatkit.create_user(...)
+print(data)
+
 ```
 
 ## Credits
