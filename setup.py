@@ -34,7 +34,6 @@ setup(
 
     install_requires=[
         'requests>=2.0.0',
-        'urllib3<1.22,>=1.21.1',
         'PyJWT>=1.6.0'
     ],
 
