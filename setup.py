@@ -33,9 +33,9 @@ setup(
     packages=find_packages(),
 
     install_requires=[
-        'requests>=2.3.0',
-        'urllib3>=1.24.1',
-        'PyJWT>=1.7.1'
+        'requests>=2.0.0',
+        'urllib3<1.22,>=1.21.1',
+        'PyJWT>=1.6.0'
     ],
 
     extras_require={
