@@ -1,6 +1,6 @@
 import json
 
-from pusher_chatkit.exceptions import PusherBadAuth, PusherBadRequest, PusherBadStatus, PusherForbidden
+from pusher_chatkit.exceptions import PusherBadAuth, PusherBadRequest, PusherBadStatus, PusherForbidden, PusherNotFound
 from urllib.parse import urlencode, quote_plus
 
 
@@ -85,6 +85,9 @@ def process_response(status, body, error=""):
 
     elif status == 403:
         raise PusherForbidden(body)
+
+    elif status == 404:
+        raise PusherNotFound()
 
     else:
         raise PusherBadStatus("%s: %s (%s)" % (status, body, error))

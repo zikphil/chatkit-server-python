@@ -10,5 +10,9 @@ class PusherForbidden(Exception):
     pass
 
 
+class PusherNotFound(Exception):
+    pass
+
+
 class PusherBadStatus(Exception):
     pass
