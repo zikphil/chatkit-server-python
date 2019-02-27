@@ -75,7 +75,7 @@ class PusherChatKitClient(object):
 
 def process_response(status, body, error=""):
     if status >= 200 and status <= 299:
-        return json.loads(body)
+        return json.loads(body) if body else None
 
     elif status == 400:
         raise PusherBadRequest(body)

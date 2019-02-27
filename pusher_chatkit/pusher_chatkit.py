@@ -92,7 +92,8 @@ class PusherChatKit(object):
     def delete_user(self, user_id):
         return self.client.delete(
             'api',
-            '/users/{}'.format(user_id)
+            '/users/{}'.format(user_id),
+            token=self.generate_token(su=True)
         )
 
     def authenticate_user(self, user_id):
@@ -118,6 +119,19 @@ class PusherChatKit(object):
             query=options,
             token=self.generate_token(su=True)
         )
+
+    def delete_all_users(self):
+        while True:
+
+            batch = self.get_users(options={'limit': 100})
+
+            if not batch:
+                break
+
+            for user in batch:
+                self.delete_user(user['id'])
+
+        return True
 
     def get_users_by_id(self, list_of_ids):
         return self.client.get(
