@@ -593,7 +593,8 @@ class PusherChatKit(object):
             '/users/{}/roles'.format(user_id),
             body={
                 'name': role_name
-            }
+            },
+            token=self.generate_token(su=True)
         )
 
     def remove_room_role_to_user(self, role_name, user_id, room_id):
