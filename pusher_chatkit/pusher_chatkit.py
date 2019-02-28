@@ -9,11 +9,30 @@ from pusher_chatkit.client import PusherChatKitClient
 class PusherChatKit(object):
 
     def __init__(self, instance_locator, api_key, backend=RequestsBackend):
+        """
+        Instantiate a new PusherChatKit object.
+
+        :param instance_locator: Instance Locator for your ChatKit Instance.
+        :param api_key: API Key of your ChatKit Instance.
+        :param backend: Backend object you wish to use.
+        """
         self.client = PusherChatKitClient(backend, instance_locator)
         self.instance_locator = instance_locator
         self.api_key = api_key
 
-    def generate_token(self, **kwargs):
+    #
+    # TOKENS
+    #
+
+    def generate_token(self, user_id=None, su=None):
+        """
+        Generates token to communicate with the pusher platform.
+
+        :param user_id: Id of the user to generate the token for.
+        :param su: Boolean to generate a sudo token.
+
+        :return: dict including the token and expiration time.
+        """
         split_instance_locator = self.instance_locator.split(':')
         split_key = self.api_key.split(':')
 
@@ -24,10 +43,10 @@ class PusherChatKit(object):
             'iat': now
         }
 
-        if 'user_id' in kwargs:
-            claims['sub'] = kwargs['user_id']
+        if user_id:
+            claims['sub'] = user_id
 
-        if 'su' in kwargs and kwargs['su'] is True:
+        if su and su is True:
             claims['su'] = True
 
         claims['exp'] = now + (24 * 60 * 60)
@@ -39,13 +58,37 @@ class PusherChatKit(object):
             'expires_in': 24 * 60 * 60
         }
 
+    def authenticate_user(self, user_id):
+        """
+        Generate a user token that can be used by ChatKit clients.
+
+        :param user_id: Id of the user.
+
+        :return: Token dict.
+        """
+        token = self.generate_token(user_id=user_id)['token']
+
+        return {
+            'access_token': token,
+            'token_type': 'bearer',
+            'expires_in': 24 * 60 * 60
+        }
+
     #
     # USERS
     #
 
     def create_user(self, user_id, name, avatar_url=None, custom_data=None):
-        if not type(user_id) == str:
-            raise Exception('user_id must be a string.')
+        """
+        Create a new user on the platform.
+
+        :param user_id: User id assigned to the user in your app.
+        :param name: Name of the new user.
+        :param avatar_url: A link to the user’s photo/image.
+        :param custom_data: Custom data that may be associated with a user.
+
+        :return: New User object (dict)
+        """
 
         return self.client.post(
             'api',
@@ -60,6 +103,13 @@ class PusherChatKit(object):
         )
 
     def batch_create_user(self, users):
+        """
+        Create multiple users in a single request.
+
+        :param users: List of user objects to create.
+
+        :return: List of New User objects dicts.
+        """
         if not type(users) == list:
             raise Exception('users must be a list of user objects.')
 
@@ -71,6 +121,16 @@ class PusherChatKit(object):
         )
 
     def update_user(self, user_id, name=None, avatar_url=None, custom_data=None):
+        """
+        Updates an existing user on the platform.
+
+        :param user_id: User id assigned to the user in your app.
+        :param name: Name of the new user.
+        :param avatar_url: A link to the user’s photo/image.
+        :param custom_data: Custom data that may be associated with a user.
+
+        :return: Updated User object (dict)
+        """
         body = {}
 
         if name:
@@ -90,40 +150,66 @@ class PusherChatKit(object):
         )
 
     def delete_user(self, user_id):
+        """
+        Deletes an existing user on the platform.
+
+        :param user_id: User id assigned to the user in your app.
+
+        :return: boolean for success status.
+        """
         return self.client.delete(
             'api',
             '/users/{}'.format(user_id),
             token=self.generate_token(su=True)
         )
 
-    def authenticate_user(self, user_id):
-        token = self.generate_token(user_id=user_id)['token']
-
-        return {
-            'access_token': token,
-            'token_type': 'bearer',
-            'expires_in': 24 * 60 * 60
-        }
-
     def get_user(self, user_id):
+        """
+        Retrieves a user from the platform.
+
+        :param user_id: User id assigned to the user in your app.
+
+        :return: User object (dict)
+        """
         return self.client.get(
             'api',
             '/users/{}'.format(user_id),
             token=self.generate_token(su=True)
         )
 
-    def get_users(self, options=None):
+    def get_users(self, from_ts=None, limit=None):
+        """
+        Retrieves many users from the platform.
+
+        :param from_ts: Timestamp (inclusive) from which users with a more recent created_at should be returned.
+        :param limit: limit of users to return. must be between1 and 100. If omitted will default to 20.
+
+        :return: List of User objects (dict)
+        """
+        params = {}
+
+        if from_ts:
+            params['from_ts'] = from_ts
+
+        if limit:
+            params['limit'] = limit
+
         return self.client.get(
             'api',
             '/users',
-            query=options,
+            query=params,
             token=self.generate_token(su=True)
         )
 
     def delete_all_users(self):
+        """
+        Loops through all users on the platform and deletes them all.
+
+        :return: True if successful, Exception if not.
+        """
         while True:
 
-            batch = self.get_users(options={'limit': 100})
+            batch = self.get_users(limit=100)
 
             if not batch:
                 break
@@ -134,6 +220,13 @@ class PusherChatKit(object):
         return True
 
     def get_users_by_id(self, list_of_ids):
+        """
+        Retrieves several users using their ids.
+
+        :param list_of_ids: List of user id strings.
+
+        :return: List of User objects (dict)
+        """
         return self.client.get(
             'api',
             '/users_by_ids',
@@ -147,7 +240,18 @@ class PusherChatKit(object):
     # ROOMS
     #
 
-    def create_room(self, name, private=False, user_ids=None, custom_data=None):
+    def create_room(self, name, creator_id, private=False, user_ids=None, custom_data=None):
+        """
+        Creates a new chat room.
+
+        :param name: Represents the name with which the room is identified.
+        :param creator_id: Id of the user we will use to create this room.
+        :param private: Indicates if a room should be private or public. By default, it is public.
+        :param user_ids: If you wish to add users to the room at the point of creation, you may provide their user IDs.
+        :param custom_data: Custom data that will be associated with the Room.
+
+        :return: New Room object (dict)
+        """
         body = {
             'name': name,
             'private': private
@@ -163,18 +267,46 @@ class PusherChatKit(object):
             'api',
             '/rooms',
             body=body,
-            token=self.generate_token(su=True)
+            token=self.generate_token(user_id=creator_id)
         )
 
-    def update_room(self, room_id, **kwargs):
+    def update_room(self, room_id, name=None, private=False, custom_data=None):
+        """
+        Updates an existing chat room.
+
+        :param room_id: Id of the room.
+        :param name: Represents the name with which the room is identified.
+        :param private: Indicates if a room should be private or public. By default, it is public.
+        :param custom_data: Custom data that will be associated with the Room.
+
+        :return: Updated Room object (dict)
+        """
+        body = {}
+
+        if name:
+            body['name'] = name
+
+        if private:
+            body['private'] = private
+
+        if custom_data:
+            body['custom_data'] = custom_data
+
         return self.client.put(
             'api',
             '/rooms/{}'.format(room_id),
-            body=kwargs,
+            body=body,
             token=self.generate_token(su=True)
         )
 
     def delete_room(self, room_id):
+        """
+        Deletes an existing chat room.
+
+        :param room_id: Id of the room.
+
+        :return: boolean for success status.
+        """
         return self.client.delete(
             'api',
             '/rooms/{}'.format(room_id),
@@ -182,21 +314,51 @@ class PusherChatKit(object):
         )
 
     def get_room(self, room_id):
+        """
+        Retrieves a chat room from the platform.
+
+        :param room_id: Id of the room.
+
+        :return: Room object (dict)
+        """
         return self.client.get(
             'api',
             '/rooms/{}'.format(room_id),
             token=self.generate_token(su=True)
         )
 
-    def get_rooms(self, options=None):
+    def get_rooms(self, from_id=None, include_private=False):
+        """
+        Retrieves many rooms from the platform.
+
+        :param from_id: ID (exclusive) from which rooms with larger IDs should be returned.
+        :param include_private: If `true` will also return private rooms present in the instance.
+
+        :return: List of Room objects (dict)
+        """
+        params = {}
+
+        if from_id:
+            params['from_id'] = from_id
+
+        if include_private:
+            params['include_private'] = include_private
+
         return self.client.get(
             'api',
             '/rooms',
-            body=options,
+            body=params,
             token=self.generate_token(su=True)
         )
 
     def get_user_rooms(self, user_id):
+        """
+        Retrieves the rooms a user has access to view.
+
+        :param user_id: Id of the user.
+
+        :return: List of Room objects (dict)
+        """
         return self.client.get(
             'api',
             '/users/{}/rooms'.format(user_id),
@@ -204,6 +366,13 @@ class PusherChatKit(object):
         )
 
     def get_user_joinable_rooms(self, user_id):
+        """
+        Retrieves the rooms a user has access to join.
+
+        :param user_id: Id of the user.
+
+        :return: List of Room objects (dict)
+        """
         return self.client.get(
             'api',
             '/users/{}/rooms'.format(user_id),
@@ -214,6 +383,14 @@ class PusherChatKit(object):
         )
 
     def add_users_to_room(self, room_id, list_of_ids):
+        """
+        Adds multiple users to a chat room.
+
+        :param room_id: Id of the room.
+        :param list_of_ids: List of user IDs to add to the room.
+
+        :return: boolean for success status.
+        """
         return self.client.put(
             'api',
             '/rooms/{}/users/add'.format(room_id),
@@ -224,6 +401,14 @@ class PusherChatKit(object):
         )
 
     def remove_users_to_room(self, room_id, list_of_ids):
+        """
+        Removes multiple users to a chat room.
+
+        :param room_id: Id of the room.
+        :param list_of_ids: List of user IDs to remove to the room.
+
+        :return: boolean for success status.
+        """
         return self.client.put(
             'api',
             '/rooms/{}/users/remove'.format(room_id),
@@ -233,11 +418,32 @@ class PusherChatKit(object):
             token=self.generate_token(su=True)
         )
 
-    def get_room_messages(self, room_id, options=None):
+    def get_room_messages(self, room_id, initial_id=None, limit=None, direction=None):
+        """
+        Retrieves messages for a given room.
+
+        :param room_id: Id of the room.
+        :param initial_id: Starting id of the range of messages (non-inclusive).
+        :param limit: Number of messages to return. If left empty, the limit is set to 20 by default.
+        :param direction: Order of messages - one of 'newer' or 'older'.
+
+        :return: List of Message objects (dict)
+        """
+        params = {}
+
+        if initial_id:
+            params['initial_id'] = initial_id
+
+        if limit:
+            params['limit'] = limit
+
+        if direction:
+            params['direction'] = direction
+
         return self.client.get(
             'api',
             '/rooms/{}/messages'.format(room_id),
-            options,
+            params,
             token=self.generate_token(su=True)
         )
 
@@ -245,18 +451,36 @@ class PusherChatKit(object):
     # MESSAGES
     #
 
-    def send_message(self, sender_id, room_id, text):
+    def send_message(self, sender_id, room_id, text, attachment=None):
+        """
+        Sends a message in a chat room.
+
+        :param sender_id: Id of the User sending the message.
+        :param room_id: Id of the Room to send the message into.
+        :param text: Message text.
+        :param attachment: Attachment to send alongside the message.
+
+        :return: message_id if successful.
+        """
         return self.client.post(
             'api',
             '/rooms/{}/messages'.format(room_id),
             body={
                 'sender_id': sender_id,
-                'text': text
+                'text': text,
+                'attachment': attachment
             },
             token=self.generate_token(su=True)
         )
 
     def delete_message(self, message_id):
+        """
+        Deletes a message in a chat room.
+
+        :param message_id: Id of the message to delete.
+
+        :return: boolean for success status.
+        """
         return self.client.delete(
             'api',
             '/messages/{}'.format(message_id),
@@ -268,6 +492,14 @@ class PusherChatKit(object):
     #
 
     def create_room_role(self, role_name, permissions=None):
+        """
+        Create a new role within a specific room only.
+
+        :param role_name: Name of the new role.
+        :param permissions: Permissions assigned to the role.
+
+        :return: None
+        """
         return self.client.post(
             'authorizer',
             '/roles',
@@ -280,6 +512,14 @@ class PusherChatKit(object):
         )
 
     def create_global_role(self, role_name, permissions=None):
+        """
+        Create a new global role.
+
+        :param role_name: Name of the new role.
+        :param permissions: Permissions assigned to the role.
+
+        :return: None
+        """
         return self.client.post(
             'authorizer',
             '/roles',
@@ -292,6 +532,13 @@ class PusherChatKit(object):
         )
 
     def delete_room_role(self, role_name):
+        """
+        Deletes a room-specific role.
+
+        :param role_name: Name of the new role.
+
+        :return: None
+        """
         return self.client.delete(
             'authorizer',
             '/roles/{}/scope/{}'.format(role_name, constants.ROOM_SCOPE),
@@ -299,6 +546,13 @@ class PusherChatKit(object):
         )
 
     def delete_global_role(self, role_name):
+        """
+        Deletes a global role.
+
+        :param role_name: Name of the new role.
+
+        :return: None
+        """
         return self.client.delete(
             'authorizer',
             '/roles/{}/scope/{}'.format(role_name, constants.GLOBAL_SCOPE),
@@ -306,6 +560,15 @@ class PusherChatKit(object):
         )
 
     def assign_room_role_to_user(self, role_name, user_id, room_id):
+        """
+        Assigns a room-specific role to a user.
+
+        :param role_name: Name of the new role.
+        :param user_id:  Id of the user.
+        :param room_id: Id of the room.
+
+        :return: None
+        """
         return self.client.put(
             'authorizer',
             '/users/{}/roles'.format(user_id),
@@ -317,6 +580,14 @@ class PusherChatKit(object):
         )
 
     def assign_global_role_to_user(self, role_name, user_id):
+        """
+        Assigns a global role to a user.
+
+        :param role_name: Name of the new role.
+        :param user_id:  Id of the user.
+
+        :return: None
+        """
         return self.client.put(
             'authorizer',
             '/users/{}/roles'.format(user_id),
@@ -326,6 +597,15 @@ class PusherChatKit(object):
         )
 
     def remove_room_role_to_user(self, role_name, user_id, room_id):
+        """
+        Removes a room-specific role to a user.
+
+        :param role_name: Name of the new role.
+        :param user_id:  Id of the user.
+        :param room_id: Id of the room.
+
+        :return: None
+        """
         return self.client.delete(
             'authorizer',
             '/users/{}/roles'.format(user_id),
@@ -337,6 +617,14 @@ class PusherChatKit(object):
         )
 
     def remove_global_role_to_user(self, role_name, user_id):
+        """
+        Removes a global role to a user.
+
+        :param role_name: Name of the new role.
+        :param user_id:  Id of the user.
+
+        :return: None
+        """
         return self.client.delete(
             'authorizer',
             '/users/{}/roles'.format(user_id),
@@ -347,6 +635,11 @@ class PusherChatKit(object):
         )
 
     def list_all_roles(self):
+        """
+        Lists all roles on the platform.
+
+        :return: List of Role objects (dict)
+        """
         return self.client.get(
             'authorizer',
             '/roles',
@@ -354,6 +647,13 @@ class PusherChatKit(object):
         )
 
     def list_user_roles(self, user_id):
+        """
+        List all roles assigned to a user.
+
+        :param user_id: Id of the user.
+
+        :return: List of Role objects (dict)
+        """
         return self.client.get(
             'authorizer',
             '/users/{}/roles'.format(user_id),
@@ -361,6 +661,13 @@ class PusherChatKit(object):
         )
 
     def list_permissions_for_room_role(self, role_name):
+        """
+        Retrieves a list of permissions for a room-specific role.
+
+        :param role_name: Name of the role.
+
+        :return: List of permissions (string)
+        """
         return self.client.get(
             'authorizer',
             '/roles/{}/scope/{}/permissions'.format(role_name, constants.ROOM_SCOPE),
@@ -368,6 +675,13 @@ class PusherChatKit(object):
         )
 
     def list_permissions_for_global_role(self, role_name):
+        """
+        Retrieves a list of permissions for a global role.
+
+        :param role_name: Name of the role.
+
+        :return: List of permissions (string)
+        """
         return self.client.get(
             'authorizer',
             '/roles/{}/scope/{}/permissions'.format(role_name, constants.GLOBAL_SCOPE),
@@ -375,6 +689,15 @@ class PusherChatKit(object):
         )
 
     def update_permissions_for_room_role(self, role_name, permissions_to_add=None, permissions_to_remove=None):
+        """
+        Updates permissions for a room-specific role.
+
+        :param role_name: Name of the role.
+        :param permissions_to_add: List of permissions to add.
+        :param permissions_to_remove: List of permissions to remove.
+
+        :return: Role object (dict)
+        """
         return self.client.put(
             'authorizer',
             '/roles/{}/scope/{}/permissions'.format(role_name, constants.ROOM_SCOPE),
@@ -386,6 +709,15 @@ class PusherChatKit(object):
         )
 
     def update_permissions_for_global_role(self, role_name, permissions_to_add=None, permissions_to_remove=None):
+        """
+        Updates permissions for a global role.
+
+        :param role_name: Name of the role.
+        :param permissions_to_add: List of permissions to add.
+        :param permissions_to_remove: List of permissions to remove.
+
+        :return: Role object (dict)
+        """
         return self.client.put(
             'authorizer',
             '/roles/{}/scope/{}/permissions'.format(role_name, constants.GLOBAL_SCOPE),
@@ -401,6 +733,14 @@ class PusherChatKit(object):
     #
 
     def get_read_cursor(self, user_id, room_id):
+        """
+        Retrieves a read cursor for a user in a chat room.
+
+        :param user_id: Id of the User.
+        :param room_id: Id of the Room.
+
+        :return: Cursor object (dict) or None
+        """
         return self.client.get(
             'cursors',
             '/cursors/0/rooms/{}/users/{}'.format(room_id, user_id),
@@ -408,6 +748,15 @@ class PusherChatKit(object):
         )
 
     def set_user_read_cursors(self, user_id, room_id, position):
+        """
+        Sets a read cursor for a user in a chat room.
+
+        :param user_id: Id of the User.
+        :param room_id: Id of the Room.
+        :param position: The message ID that the user has read up to
+
+        :return: None
+        """
         return self.client.put(
             'cursors',
             '/cursors/0/rooms/{}/users/{}'.format(room_id, user_id),
@@ -418,18 +767,29 @@ class PusherChatKit(object):
         )
 
     def get_room_read_cursor(self, room_id):
+        """
+        Retrieves all the user cursors for a chat room.
+
+        :param room_id: Id of the Room.
+
+        :return: List of Cursor objects (dict)
+        """
         return self.client.get(
             'cursors',
             '/cursors/0/rooms/{}'.format(room_id),
             token=self.generate_token(su=True)
         )
 
-    def set_room_read_cursors(self, room_id, position):
-        return self.client.put(
+    def get_user_read_cursor(self, user_id):
+        """
+        Retrieves all the user cursors for all chat room.
+
+        :param user_id: Id of the User.
+
+        :return: List of Cursor objects (dict)
+        """
+        return self.client.get(
             'cursors',
-            '/cursors/0/rooms/{}'.format(room_id),
-            body={
-                'position': position
-            },
+            '/cursors/0/users/{}'.format(user_id),
             token=self.generate_token(su=True)
         )
