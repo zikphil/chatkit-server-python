@@ -4,6 +4,7 @@ from datetime import datetime
 from pusher_chatkit import constants
 from pusher_chatkit.backends import RequestsBackend
 from pusher_chatkit.client import PusherChatKitClient
+from pusher_chatkit.exceptions import PusherNotFound
 
 
 class PusherChatKit(object):
@@ -794,3 +795,35 @@ class PusherChatKit(object):
             '/cursors/0/users/{}'.format(user_id),
             token=self.generate_token(su=True)
         )
+
+    #
+    # SEARCH
+    #
+
+    def search_rooms_by_name(self, room_name):
+        """
+        Search through all rooms in your instances.
+
+        :param room_name: The name of the room we need to look for.
+
+        :return: Room object (dict) or None
+        """
+        from_id = 0
+
+        while True:
+            try:
+                rooms = self.get_rooms(from_id=from_id, include_private=True)
+
+                if not rooms:
+                    break
+
+                from_id = rooms[-1]['id']
+
+                for room in rooms:
+                    if room['name'] == room_name:
+                        return room
+
+            except PusherNotFound:
+                break
+
+        return None
