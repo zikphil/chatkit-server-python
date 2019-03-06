@@ -348,7 +348,7 @@ class PusherChatKit(object):
         return self.client.get(
             'api',
             '/rooms',
-            body=params,
+            query=params,
             token=self.generate_token(su=True)
         )
 
@@ -813,15 +813,16 @@ class PusherChatKit(object):
         while True:
             try:
                 rooms = self.get_rooms(from_id=from_id, include_private=True)
+                print(rooms)
+
+                for room in rooms:
+                    if room['name'] == room_name:
+                        return room
 
                 if int(from_id) > 0 and ([x for x in rooms if x['id'] == from_id] and len(rooms) == 1):
                     break
 
                 from_id = rooms[-1]['id']
-
-                for room in rooms:
-                    if room['name'] == room_name:
-                        return room
 
             except PusherNotFound:
                 break
