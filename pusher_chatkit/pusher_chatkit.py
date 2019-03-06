@@ -813,7 +813,6 @@ class PusherChatKit(object):
         while True:
             try:
                 rooms = self.get_rooms(from_id=from_id, include_private=True)
-                print(rooms)
 
                 for room in rooms:
                     if room['name'] == room_name:
